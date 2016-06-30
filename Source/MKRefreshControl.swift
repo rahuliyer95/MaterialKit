@@ -31,6 +31,13 @@ public class MKRefreshControl: UIControl {
         }
     }
 
+    deinit {
+        if let parentScrollView = parentScrollView {
+            parentScrollView.removeObserver(self, forKeyPath: "contentOffset")
+            parentScrollView.panGestureRecognizer.removeTarget(self, action: #selector(MKRefreshControl.handlePanGestureRecognizer))
+        }
+    }
+
     override public init(frame: CGRect) {
         super.init(frame: frame)
         setupRefreshControl()
@@ -51,7 +58,7 @@ public class MKRefreshControl: UIControl {
         if let parentScrollView = self.parentScrollView {
             parentScrollView.addSubview(self)
             parentScrollView.sendSubviewToBack(self)
-            parentScrollView.panGestureRecognizer.addTarget(self, action: "handlePanGestureRecognizer")
+            parentScrollView.panGestureRecognizer.addTarget(self, action: #selector(MKRefreshControl.handlePanGestureRecognizer))
             parentScrollView.addObserver(self, forKeyPath: "contentOffset", options: .New, context: nil)
         }
     }
@@ -150,7 +157,7 @@ public class MKRefreshControl: UIControl {
             self.exitAnimation(forRefreshView: animationView) { () -> Void in
                 UIView.animateWithDuration(0.25, animations: { () -> Void in
                     self.setScrollViewTopInsets(withOffset: -self.height)
-                }, completion: { (Bool) -> Void in
+                    }, completion: { (Bool) -> Void in
                     if let parentScrollView = self.parentScrollView {
                         parentScrollView.scrollRectToVisible(CGRectMake(0, 0, 1, 1), animated: true)
                     }
@@ -166,15 +173,22 @@ public class MKRefreshControl: UIControl {
 
     private func resetAnimationView(animationView: UIView) {
         self.rotation = 0
-        if let circleView = self.circleView {
-            circleView.alpha = 1
-            circleView.transform = CGAffineTransformMakeRotation(self.rotation)
+        guard let circleView = self.circleView else {
+            clearProgressLayerAnimation()
+            return
         }
-        if let progressLayer = self.progressLayer {
-            progressLayer.strokeStart = 0
-            progressLayer.strokeEnd = 0
-            progressLayer.removeAllAnimations()
+        circleView.alpha = 1
+        circleView.transform = CGAffineTransformMakeRotation(self.rotation)
+        clearProgressLayerAnimation()
+    }
+
+    private func clearProgressLayerAnimation() {
+        guard let progressLayer = self.progressLayer else {
+            return
         }
+        progressLayer.strokeStart = 0
+        progressLayer.strokeEnd = 0
+        progressLayer.removeAllAnimations()
     }
 
     private func setupRefreshControl(forAnimationView animationView: UIView) {
@@ -278,7 +292,7 @@ public class MKRefreshControl: UIControl {
 
     // MARK: ScrollView Observers
 
-    override public func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [String : AnyObject]?, context: UnsafeMutablePointer<Void>) {
+    override public func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [String: AnyObject]?, context: UnsafeMutablePointer<Void>) {
         if let keyPath = keyPath {
             if keyPath == "contentOffset" {
                 if let object = object as? UIScrollView, parentScrollView = self.parentScrollView {
